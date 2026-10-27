@@ -1,0 +1,18 @@
+{
+  "name": "green-runner",
+  "version": "1.0.0",
+  "description": "GreenRunner: a hands-off, carbon-aware GitLab CI pipeline optimizer with a zero-dependency engine",
+  "main": "engine.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "author": "Aariv Patel",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "homepage": "https://aariv.me/green-runner/",
+  "bin": {
+    "green-runner": "cli.js"
+  }
+}

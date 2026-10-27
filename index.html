@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GreenRunner, a hands-off carbon-aware CI/CD pipeline optimizer</title>
+<meta name="description" content="Paste a .gitlab-ci.yml and let a hands-off agent shift deferrable jobs into low-carbon grid windows, right-size over-provisioned runners and write the patch and merge request report.">
+<meta name="theme-color" content="#06130d">
+<meta property="og:title" content="GreenRunner, a carbon-aware CI/CD optimizer">
+<meta property="og:description" content="A hands-off Duo-style agent that estimates pipeline energy and carbon, shifts deferrable jobs and right-sizes runner tags.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://aariv.me/green-runner/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2306130d'/%3E%3Cpath d='M8 22c0-8 6-13 16-14 0 9-5 15-14 15' fill='%238cf26b'/%3E%3Cpath d='M9 24c4-6 8-9 12-11' stroke='%2306130d' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the pipeline</a>
+
+<header class="top">
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path d="M8 22c0-8 6-13 16-14 0 9-5 15-14 15" fill="currentColor"/><path d="M9 24c4-6 8-9 12-11" stroke="#06130d" stroke-width="2" fill="none"/></svg>
+    <div>
+      <h1>GreenRunner</h1>
+      <p class="tag">Hands-off carbon-aware CI/CD optimizer for GitLab pipelines</p>
+    </div>
+  </div>
+
+  <div class="judge" role="group" aria-label="Judge shortcuts">
+    <button id="btn-run" type="button" class="btn primary">Run Hands-Off Duo Agent</button>
+    <button id="btn-run-region" type="button" class="btn ghost">Run With Region Shift</button>
+    <button id="btn-apply" type="button" class="btn orange">Apply Patch To Editor</button>
+  </div>
+</header>
+
+<main id="main" class="board">
+  <div class="col">
+    <section class="panel" aria-labelledby="h-in">
+      <h2 id="h-in">Pipeline input</h2>
+      <label class="field" for="preset-select"><span>Preset</span>
+        <select id="preset-select"></select>
+      </label>
+      <label class="field" for="ci-editor"><span>.gitlab-ci.yml</span>
+        <textarea id="ci-editor" rows="18" spellcheck="false"></textarea>
+      </label>
+      <p id="parse-status" class="status" aria-live="polite"></p>
+      <label class="field" for="telemetry-editor"><span>Job telemetry (JSON: durationMin, peakRssMb, avgCpuPct, peakCpuPct)</span>
+        <textarea id="telemetry-editor" rows="8" spellcheck="false"></textarea>
+      </label>
+    </section>
+
+    <section class="panel" aria-labelledby="h-opt">
+      <h2 id="h-opt">Agent settings</h2>
+      <div class="opts">
+        <label class="field" for="opt-region"><span>Baseline region</span>
+          <select id="opt-region"></select>
+        </label>
+        <label class="field" for="opt-hour"><span>Pipeline start (UTC hour)</span>
+          <input id="opt-hour" type="number" min="0" max="23" value="19" inputmode="numeric">
+        </label>
+        <label class="field" for="opt-delay"><span>Max delay (hours)</span>
+          <input id="opt-delay" type="number" min="0" max="23" value="14" inputmode="numeric">
+        </label>
+        <label class="check" for="opt-region-shift"><input id="opt-region-shift" type="checkbox"> Allow region shift</label>
+      </div>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="panel" aria-labelledby="h-grid">
+      <h2 id="h-grid">24-hour grid carbon intensity and job shifts</h2>
+      <canvas id="carbon-canvas" width="860" height="480" role="img" aria-label="Grid carbon intensity curves for six regions, no run yet"></canvas>
+      <ul id="legend" class="legend" aria-label="Regions"></ul>
+      <div id="summary" class="summary" aria-live="polite"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-diff">
+      <h2 id="h-diff">YAML patch</h2>
+      <div class="diff-wrap">
+        <table id="diff-view" class="diff" aria-label="Side by side YAML patch"></table>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-job">
+      <h2 id="h-job">Per-job estimate</h2>
+      <div class="diff-wrap"><table id="job-table" class="jobs" aria-label="Per job energy and carbon"></table></div>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="panel" aria-labelledby="h-trace">
+      <h2 id="h-trace">Agent execution trace</h2>
+      <ol id="trace-log" class="trace" aria-live="polite"></ol>
+    </section>
+
+    <section class="panel" aria-labelledby="h-mr">
+      <h2 id="h-mr">Merge request report</h2>
+      <pre id="mr-report" class="report" tabindex="0" aria-label="Merge request report"></pre>
+      <h3 class="sub">Schedules to create</h3>
+      <ul id="schedule-list" class="plain"></ul>
+    </section>
+  </div>
+</main>
+
+<footer class="foot">
+  <p>GreenRunner is a contest entry built with AI assistance. Grid curves are synthetic and every figure is a model estimate, not a measurement. The agent runs locally in this page and has not been executed on the GitLab Duo Agent Platform; see docs/agents.md. MIT licensed, source on GitHub under draarivpatel-ui.</p>
+</footer>
+
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+image: node:22
+setup_script:
+  - node --version
+network_policy:
+  allowed_domains:
+    - docs.gitlab.com

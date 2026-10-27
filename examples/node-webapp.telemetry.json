@@ -1,0 +1,44 @@
+{
+  "install-build": {
+    "durationMin": 6,
+    "peakRssMb": 2800,
+    "avgCpuPct": 38,
+    "peakCpuPct": 70
+  },
+  "unit-test": {
+    "durationMin": 7,
+    "peakRssMb": 3200,
+    "avgCpuPct": 22,
+    "peakCpuPct": 41
+  },
+  "lint": {
+    "durationMin": 3,
+    "peakRssMb": 900,
+    "avgCpuPct": 18,
+    "peakCpuPct": 30
+  },
+  "sast": {
+    "durationMin": 5,
+    "peakRssMb": 2100,
+    "avgCpuPct": 30,
+    "peakCpuPct": 45
+  },
+  "container_scanning": {
+    "durationMin": 8,
+    "peakRssMb": 3500,
+    "avgCpuPct": 20,
+    "peakCpuPct": 35
+  },
+  "fuzz-api": {
+    "durationMin": 30,
+    "peakRssMb": 5000,
+    "avgCpuPct": 55,
+    "peakCpuPct": 75
+  },
+  "deploy-staging": {
+    "durationMin": 2,
+    "peakRssMb": 600,
+    "avgCpuPct": 20,
+    "peakCpuPct": 40
+  }
+}
