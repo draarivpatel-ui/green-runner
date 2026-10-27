@@ -1,0 +1,25 @@
+stages:
+  - test
+  - green
+
+test:
+  stage: test
+  image: node:22
+  tags:
+    - saas-linux-small-amd64
+  script:
+    - npm test
+
+green-agent:
+  stage: green
+  image: node:22
+  tags:
+    - saas-linux-small-amd64
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - node cli.js examples/node-webapp.gitlab-ci.yml --telemetry examples/node-webapp.telemetry.json --report green-report.md
+  artifacts:
+    paths:
+      - green-report.md
+    expire_in: 1 week
