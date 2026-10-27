@@ -1,0 +1,201 @@
+[
+  {
+    "do": "eval",
+    "js": "new Promise(r => { const f = () => document.querySelector('#btn-run') ? r() : setTimeout(f, 50); f(); })"
+  },
+  {
+    "do": "move",
+    "selector": "#preset-select",
+    "ms": 600
+  },
+  {
+    "do": "scrollBy",
+    "y": 150,
+    "ms": 900
+  },
+  {
+    "do": "move",
+    "selector": "#ci-editor",
+    "ms": 650
+  },
+  {
+    "do": "click",
+    "selector": "#btn-run",
+    "ms": 750
+  },
+  {
+    "do": "scrollBy",
+    "y": 180,
+    "ms": 950
+  },
+  {
+    "do": "move",
+    "selector": "#carbon-canvas",
+    "ms": 750
+  },
+  {
+    "do": "scrollBy",
+    "y": 180,
+    "ms": 900
+  },
+  {
+    "do": "move",
+    "selector": "#diff-view",
+    "ms": 750
+  },
+  {
+    "do": "scrollBy",
+    "y": -180,
+    "ms": 850
+  },
+  {
+    "do": "click",
+    "selector": "#btn-run-region",
+    "ms": 750
+  },
+  {
+    "do": "scrollBy",
+    "y": 220,
+    "ms": 950
+  },
+  {
+    "do": "move",
+    "selector": "#job-table",
+    "ms": 750
+  },
+  {
+    "do": "scrollBy",
+    "y": 180,
+    "ms": 900
+  },
+  {
+    "do": "move",
+    "selector": "#trace-log",
+    "ms": 700
+  },
+  {
+    "do": "scrollBy",
+    "y": 180,
+    "ms": 900
+  },
+  {
+    "do": "move",
+    "selector": "#mr-report",
+    "ms": 700
+  },
+  {
+    "do": "scrollBy",
+    "y": -420,
+    "ms": 1000
+  },
+  {
+    "do": "click",
+    "selector": "#btn-apply",
+    "ms": 750
+  },
+  {
+    "do": "scrollBy",
+    "y": 160,
+    "ms": 900
+  },
+  {
+    "do": "slide",
+    "selector": "#opt-hour",
+    "to": 14,
+    "ms": 950
+  },
+  {
+    "do": "slide",
+    "selector": "#opt-delay",
+    "to": 8,
+    "ms": 950
+  },
+  {
+    "do": "click",
+    "selector": "#btn-run-region",
+    "ms": 750
+  },
+  {
+    "do": "scrollBy",
+    "y": 200,
+    "ms": 950
+  },
+  {
+    "do": "move",
+    "selector": "#carbon-canvas",
+    "ms": 750
+  },
+  {
+    "do": "scrollBy",
+    "y": -220,
+    "ms": 900
+  },
+  {
+    "do": "eval",
+    "js": "(() => { const el = document.querySelector('#preset-select'); if (el && el.options.length > 1) { el.selectedIndex = 1; el.dispatchEvent(new Event('change', {bubbles:true})); } })()"
+  },
+  {
+    "do": "scrollBy",
+    "y": 160,
+    "ms": 900
+  },
+  {
+    "do": "click",
+    "selector": "#btn-run-region",
+    "ms": 750
+  },
+  {
+    "do": "scrollBy",
+    "y": 220,
+    "ms": 950
+  },
+  {
+    "do": "move",
+    "selector": "#diff-view",
+    "ms": 750
+  },
+  {
+    "do": "scrollBy",
+    "y": 200,
+    "ms": 900
+  },
+  {
+    "do": "move",
+    "selector": "#job-table",
+    "ms": 700
+  },
+  {
+    "do": "scrollBy",
+    "y": -360,
+    "ms": 1000
+  },
+  {
+    "do": "eval",
+    "js": "(() => { const el = document.querySelector('#preset-select'); if (el && el.options.length > 2) { el.selectedIndex = 2; el.dispatchEvent(new Event('change', {bubbles:true})); } })()"
+  },
+  {
+    "do": "scrollBy",
+    "y": 160,
+    "ms": 900
+  },
+  {
+    "do": "click",
+    "selector": "#btn-run-region",
+    "ms": 750
+  },
+  {
+    "do": "scrollBy",
+    "y": 200,
+    "ms": 950
+  },
+  {
+    "do": "click",
+    "selector": "#btn-apply",
+    "ms": 750
+  },
+  {
+    "do": "scrollBy",
+    "y": -240,
+    "ms": 950
+  }
+]
