@@ -1,0 +1,5 @@
+GreenRunner is a GitLab Duo Agent Platform carbon and cost optimizer for continuous integration pipelines.
+Software teams paste or select a real GitLab CI YAML configuration alongside runner duration telemetry, and GreenRunner parses every stage, job dependency, interruptible flag, and runner tag.
+Our four agent pipeline crew, comprising the Pipeline DAG Parser, Grid Carbon Forecaster, DAG Critical Path Scheduler, and Merge Request Patcher, models twenty four hour regional grid carbon intensity across Virginia, Oregon, Frankfurt, and Stockholm.
+The interactive twenty four hour heatmap canvas compares baseline job execution against carbon shifted and region routed schedules while strictly preserving critical path deadlines for blocking merge request jobs.
+With one click, GreenRunner applies the generated GitLab CI YAML diff patch and produces a complete merge request sustainability telemetry report.
