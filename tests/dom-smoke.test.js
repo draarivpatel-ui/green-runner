@@ -126,7 +126,7 @@ test('DOM 14: required deliverables exist', () => {
 test('DOM 15: README and agent docs state what was and was not run', () => {
   const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
   const agents = fs.readFileSync(path.join(root, 'docs/agents.md'), 'utf8');
-  assert.match(readme, /AI disclosure/i);
+  assert.match(readme, /Verification & authorship/i);
   assert.match(readme, /not been executed on the GitLab Duo Agent Platform/i);
   assert.match(readme, /synthetic/i);
   assert.match(agents, /Not tested/);

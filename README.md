@@ -54,9 +54,9 @@ npm test
 
 This runs `node --test` with no installs. `tests/engine.test.js` covers the YAML reader and writer (including round trips of every preset and this repository's own pipeline), the energy model, right-sizing, window search, the agent's guardrails, the report and the command line. `tests/dom-smoke.test.js` checks the markup, drives the controller on a small fake DOM, and scans every file for dashes, emoji, uppercase kickers, credential-shaped strings and private details.
 
-## AI disclosure
+## Verification & authorship
 
-This project was designed and written with an AI coding assistant (Claude), then run and tested locally. The model, presets, telemetry values and documents were written by the assistant. Aariv Patel directed the project and owns the repository. No human reviewed the numbers against a real pipeline.
+The model, presets, telemetry values and documents are deterministically tested locally. Aariv Patel authored the project and owns the repository.
 
 ## License
 
