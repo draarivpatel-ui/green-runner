@@ -268,8 +268,9 @@ test('Engine 38: allowing every region finds a window at least as good as stayin
 });
 
 test('Engine 39: windowId and cronFor format hours and wrap past midnight', () => {
-  assert.equal(G.windowId('europe-north1', 3), 'europe-north1-03');
-  assert.equal(G.windowId('us-west1', 27.5), 'us-west1-03');
+  assert.equal(G.windowId('europe-north1', 3), 'europe-north1-0300');
+  assert.equal(G.windowId('us-west1', 27.5), 'us-west1-0330');
+  assert.notEqual(G.windowId('us-west1', 3), G.windowId('us-west1', 3.5));
   assert.equal(G.cronFor(3), '0 3 * * *');
   assert.equal(G.cronFor(27.5), '30 3 * * *');
 });
@@ -333,8 +334,9 @@ test('Engine 47: shifted jobs get a schedule rule whose window has a matching sc
   const shifted = r.changes.filter((c) => c.type === 'shift-time');
   assert.ok(shifted.length >= 1);
   shifted.forEach((c) => {
-    assert.equal(r.patched[c.job].rules.length, 1);
+    assert.equal(r.patched[c.job].rules.length, 2);
     assert.ok(r.patched[c.job].rules[0].if.includes('$GREEN_WINDOW == "' + c.window + '"'));
+    assert.deepEqual(r.patched[c.job].rules[1], { when: 'never' });
     assert.ok(r.schedules.some((s) => s.id === c.window && s.variables.GREEN_WINDOW === c.window));
   });
 });
@@ -493,4 +495,220 @@ test('Engine 67: the CLI fails cleanly on broken YAML and broken telemetry', () 
     assert.equal(cli.main([bad], capture()), 1);
     assert.equal(cli.main([example, '--telemetry', badTel], capture()), 2);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('Engine 72: a needs chain pins transitively, whatever order jobs come in', () => {
+  const y = [
+    'stages: [build, test, fuzz]',
+    'ship:',
+    '  stage: build',
+    '  script: make',
+    '  needs: [dast-mid]',
+    'dast-mid:',
+    '  stage: test',
+    '  script: scan',
+    '  needs: [fuzz-api]',
+    'fuzz-api:',
+    '  stage: fuzz',
+    '  script: fuzz'
+  ].join('\n');
+  const cls = G.classify(G.parseGitlabCI(y));
+  assert.equal(cls['fuzz-api'].deferrable, false);
+  assert.match(cls['fuzz-api'].reason, /needs/);
+  assert.equal(cls['dast-mid'].deferrable, false);
+});
+
+test('Engine 73: deferrable jobs joined by needs share one window and keep their order', () => {
+  const y = [
+    'stages: [test, security, fuzz]',
+    'unit:',
+    '  stage: test',
+    '  script: test',
+    'dast-crawl:',
+    '  stage: security',
+    '  script: crawl',
+    'dast-scan:',
+    '  stage: fuzz',
+    '  script: scan',
+    '  needs: [dast-crawl]'
+  ].join('\n');
+  const r = G.runGreenAgent(y, {
+    'unit': { durationMin: 5, peakRssMb: 1000, avgCpuPct: 20, peakCpuPct: 40 },
+    'dast-crawl': { durationMin: 20, peakRssMb: 3000, avgCpuPct: 50, peakCpuPct: 80 },
+    'dast-scan': { durationMin: 25, peakRssMb: 3000, avgCpuPct: 50, peakCpuPct: 80 }
+  }, { minGainPct: 0 });
+  const moved = r.changes.filter((c) => c.type === 'shift-time' || c.type === 'shift-region');
+  assert.ok(moved.length >= 2, 'both deferrable jobs should move');
+  const wins = new Set(moved.map((c) => c.window));
+  assert.equal(wins.size, 1, 'linked jobs must share one window');
+  const scan = r.patched['dast-scan'];
+  assert.deepEqual(scan.needs, ['dast-crawl'], 'intra-group needs stay for ordering');
+  assert.equal(r.schedules.length, 1);
+});
+
+test('Engine 74: needs pointing outside the schedule are dropped, not left to fail', () => {
+  const y = [
+    'stages: [build, fuzz]',
+    'build-app:',
+    '  stage: build',
+    '  script: make',
+    'fuzz-api:',
+    '  stage: fuzz',
+    '  script: fuzz',
+    '  needs: [build-app]',
+    '  dependencies: [build-app]'
+  ].join('\n');
+  const r = G.runGreenAgent(y, {
+    'build-app': { durationMin: 5, peakRssMb: 1000, avgCpuPct: 50, peakCpuPct: 80 },
+    'fuzz-api': { durationMin: 30, peakRssMb: 3000, avgCpuPct: 50, peakCpuPct: 80 }
+  }, { minGainPct: 0 });
+  const fuzz = r.patched['fuzz-api'];
+  assert.equal(fuzz.needs, undefined);
+  assert.equal(fuzz.dependencies, undefined);
+  const c = r.changes.filter((x) => x.job === 'fuzz-api' && (x.type === 'shift-time' || x.type === 'shift-region'))[0];
+  assert.equal(c.droppedNeeds, 2);
+});
+
+test('Engine 75: only and except are removed when the rules gate lands', () => {
+  const y = [
+    'stages: [test, fuzz]',
+    'unit:',
+    '  stage: test',
+    '  script: test',
+    'fuzz-api:',
+    '  stage: fuzz',
+    '  script: fuzz',
+    '  only: [main]'
+  ].join('\n');
+  const r = G.runGreenAgent(y, {
+    'unit': { durationMin: 5, peakRssMb: 1000, avgCpuPct: 20, peakCpuPct: 40 },
+    'fuzz-api': { durationMin: 30, peakRssMb: 3000, avgCpuPct: 50, peakCpuPct: 80 }
+  }, { minGainPct: 0 });
+  const fuzz = r.patched['fuzz-api'];
+  assert.equal(fuzz.only, undefined);
+  assert.equal(fuzz.except, undefined);
+  assert.deepEqual(fuzz.rules[1], { when: 'never' });
+  assert.match(r.report, /removed an `only`\/`except` gate/);
+});
+
+test('Engine 76: spec, already-gated jobs, and undeclared stages behave', () => {
+  const withSpec = G.parseGitlabCI('spec:\n  inputs:\n    v: {}\nstages: [test]\nunit:\n  stage: test\n  script: go\n');
+  assert.deepEqual(G.jobsOf(withSpec), ['unit']);
+  const y = [
+    'stages: [test, fuzz]',
+    'unit:',
+    '  stage: test',
+    '  script: t',
+    'fuzz-api:',
+    '  stage: fuzz',
+    '  script: f',
+    '  rules:',
+    '    - if: \'$GREEN_WINDOW == "us-central1-0300"\''
+  ].join('\n');
+  const r = G.runGreenAgent(y, {
+    'unit': { durationMin: 5, peakRssMb: 1000, avgCpuPct: 20, peakCpuPct: 40 },
+    'fuzz-api': { durationMin: 30, peakRssMb: 3000, avgCpuPct: 50, peakCpuPct: 80 }
+  }, { minGainPct: 0 });
+  const kept = r.changes.filter((c) => c.job === 'fuzz-api' && c.type === 'kept')[0];
+  assert.match(kept.reason, /already on a GREEN_WINDOW schedule/);
+  const odd = G.simulatePipeline(G.parseGitlabCI('stages: [test]\nunit:\n  stage: test\n  script: t\nlintish:\n  stage: lint\n  script: l\n'),
+    G.normalizeTelemetry(G.parseGitlabCI('stages: [test]\nunit:\n  stage: test\n  script: t\nlintish:\n  stage: lint\n  script: l\n'), {}), {});
+  assert.equal(odd.rows.length, 2, 'undeclared stage still gets simulated');
+});
+
+test('Engine 77: negative or non-finite telemetry never produces negative energy', () => {
+  const d = G.parseGitlabCI(fs.readFileSync(example, 'utf8'));
+  const t = G.normalizeTelemetry(d, {
+    lint: { durationMin: -5, peakRssMb: -900, avgCpuPct: -10, peakCpuPct: -20 },
+    'unit-test': { durationMin: Infinity, peakRssMb: Infinity },
+    sast: { durationMin: 'junk', peakRssMb: 'junk' }
+  });
+  assert.equal(t.lint.durationMin, 1);
+  assert.equal(t.lint.peakRssMb, 0);
+  assert.equal(t['unit-test'].durationMin, 1);
+  assert.equal(t['unit-test'].peakRssMb, 0);
+  Object.keys(t).forEach((name) => {
+    const wh = G.jobEnergyWh(G.runnerTagOf(d[name]), t[name]);
+    assert.ok(Number.isFinite(wh) && wh >= 0, name + ' wh=' + wh);
+  });
+});
+
+test('Engine 78: huge durations stay finite and bounded instead of hanging', () => {
+  const t0 = Date.now();
+  const avg = G.avgIntensity('us-central1', 19, 1e9);
+  assert.ok(Date.now() - t0 < 5000, 'avgIntensity took too long');
+  assert.ok(Number.isFinite(avg) && avg > 0);
+});
+
+test('Engine 79: avgIntensity matches the naive minute walk on multi-day jobs', () => {
+  var naive = 0;
+  var steps = 3000;
+  for (var s = 0; s < steps; s += 1) naive += G.intensityAt('europe-west4', 7 + (s + 0.5) / 60);
+  naive /= steps;
+  assert.ok(Math.abs(G.avgIntensity('europe-west4', 7, 3000) - naive) < 1e-9);
+});
+
+test('Engine 80: duplicate keys, unterminated scalars, nested lists and proto keys are all rejected or kept safe', () => {
+  assert.throws(() => G.parseYaml('a: 1\na: 2\n'), /duplicate key "a"/);
+  assert.throws(() => G.parseYaml('a:\n  b: 1\n  b: 2\n'), /duplicate key "b"/);
+  assert.throws(() => G.parseYaml("a: 'unterminated\n"), /unterminated quoted scalar/);
+  assert.throws(() => G.parseYaml('a: "unterminated\n'), /unterminated quoted scalar/);
+  assert.throws(() => G.parseYaml('a: [1, 2\n'), /unterminated flow sequence/);
+  assert.throws(() => G.parseYaml('a: {x: 1\n'), /unterminated flow mapping/);
+  assert.throws(() => G.parseYaml('a: {x: 1, x: 2}\n'), /duplicate key "x" in inline map/);
+  assert.throws(() => G.parseYaml('a:\n  - - x\n'), /nested lists are not supported/);
+  const proto = G.parseYaml('__proto__:\n  script: echo hi\n');
+  assert.deepEqual(proto.__proto__, { script: 'echo hi' });
+  assert.equal({}.polluted, undefined);
+});
+
+test('Engine 81: block scalars accept chomping indicators, keep blank lines and survive CR line ends', () => {
+  const lit = G.parseYaml('job:\n  script: |-\n    echo a\n    echo b\n');
+  assert.equal(lit.job.script, 'echo a\necho b');
+  const keep = G.parseYaml('job:\n  script: |+\n    echo a\n\n    echo b\n\n');
+  assert.equal(keep.job.script, 'echo a\n\necho b\n\n');
+  const folded = G.parseYaml('job:\n  script: >\n    one two\n\n    three\n');
+  assert.equal(folded.job.script, 'one two\nthree');
+  const cr = G.parseYaml('a: 1\rb: 2\r');
+  assert.deepEqual(cr, { a: 1, b: 2 });
+  const dump = G.dumpYaml({ job: { script: 'echo a\n\necho b' } });
+  assert.equal(G.parseYaml(dump).job.script, 'echo a\n\necho b');
+});
+
+test('Engine 82: hostile job names cannot inject markdown into the report', () => {
+  const y = [
+    'stages: [test, fuzz]',
+    'unit:',
+    '  stage: test',
+    '  script: t',
+    '"fuzz`x`:',
+    '  stage: fuzz',
+    '  script: f'
+  ].join('\n');
+  const r = G.runGreenAgent(y, {
+    'unit': { durationMin: 5, peakRssMb: 1000, avgCpuPct: 20, peakCpuPct: 40 },
+    'fuzz`x': { durationMin: 30, peakRssMb: 3000, avgCpuPct: 50, peakCpuPct: 80 }
+  }, { minGainPct: 0 });
+  assert.ok(!/````/.test(r.report), 'backticks in a job name must not break the report');
+});
+
+test('Engine 83: array telemetry falls back to an estimate, not measured zeros', () => {
+  const d = G.parseGitlabCI('stages: [test]\nunit:\n  stage: test\n  script: t\n');
+  const t = G.normalizeTelemetry(d, { unit: [30, 1000, 50, 80] });
+  assert.equal(t.unit.estimated, true);
+  assert.equal(t.unit.durationMin, 5);
+});
+
+test('Engine 84: the CLI rejects bad --hour and bad --max-slowdown values', () => {
+  [ ['--hour', '99'], ['--hour', '-3'], ['--hour', 'abc'], ['--hour', 'Infinity'] ].forEach((h) => {
+    const a = capture();
+    assert.equal(cli.main([example].concat(h), a), 2, JSON.stringify(h));
+    assert.match(a.errs.join(' '), /--hour must be an integer/);
+  });
+  const a = capture();
+  assert.equal(cli.main([example, '--hour', '3'], a), 0);
+  const b = capture();
+  assert.equal(cli.main([example, '--max-slowdown', '0.5'], b), 2);
+  const c = capture();
+  assert.equal(cli.main([example, '--max-slowdown', '1.02'], c), 0);
 });

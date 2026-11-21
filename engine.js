@@ -73,18 +73,32 @@
     return s.slice(1, -1).replace(/''/g, "'");
   }
 
+  function setOwn(obj, k, v) {
+    if (k === '__proto__') {
+      Object.defineProperty(obj, k, { value: v, writable: true, enumerable: true, configurable: true });
+    } else obj[k] = v;
+  }
+
   function parseScalar(raw) {
     var s = raw.trim();
     if (s === '') return null;
     var first = s[0], last = s[s.length - 1];
-    if ((first === '"' && last === '"' && s.length > 1) || (first === "'" && last === "'" && s.length > 1)) return unquote(s);
-    if (first === '[' && last === ']') return splitTop(s.slice(1, -1)).map(parseScalar);
-    if (first === '{' && last === '}') {
+    if (first === '"' || first === "'") {
+      if (last === first && s.length > 1) return unquote(s);
+      throw new Error('unterminated quoted scalar: ' + s.slice(0, 40));
+    }
+    if (first === '[') {
+      if (last !== ']') throw new Error('unterminated flow sequence: ' + s.slice(0, 40));
+      return splitTop(s.slice(1, -1)).map(parseScalar);
+    }
+    if (first === '{') {
+      if (last !== '}') throw new Error('unterminated flow mapping: ' + s.slice(0, 40));
       var o = {};
       splitTop(s.slice(1, -1)).forEach(function (p) {
         var kv = splitKey(p.trim());
         if (!kv) throw new Error('bad inline map entry: ' + p.trim());
-        o[kv.key] = parseScalar(kv.rest);
+        if (Object.prototype.hasOwnProperty.call(o, kv.key)) throw new Error('duplicate key "' + kv.key + '" in inline map');
+        setOwn(o, kv.key, parseScalar(kv.rest));
       });
       return o;
     }
@@ -113,14 +127,22 @@
   }
 
   function parseYaml(text) {
-    var raw = String(text).replace(/\r\n/g, '\n').split('\n');
+    var raw = String(text).replace(/\r\n?/g, '\n').split('\n');
     var lines = [];
+    var blockIndent = null;
     raw.forEach(function (line, i) {
       var lead = line.match(/^\s*/)[0];
       if (lead.indexOf('\t') !== -1) { if (line.trim() && line.trim()[0] !== '#') throw new Error('tabs are not allowed (line ' + (i + 1) + ')'); }
       var s = stripComment(line);
-      if (!s.trim()) return;
-      lines.push({ indent: s.match(/^ */)[0].length, text: s.trim(), no: i + 1 });
+      var trimmed = s.trim();
+      var indent = s.match(/^ */)[0].length;
+      if (!trimmed) {
+        if (blockIndent !== null) lines.push({ indent: blockIndent + 1, text: '', no: i + 1 });
+        return;
+      }
+      if (blockIndent !== null && indent <= blockIndent) blockIndent = null;
+      lines.push({ indent: indent, text: trimmed, no: i + 1 });
+      if (/:\s*[|>][+-]?\d*\s*$/.test(trimmed) || /^-\s*[|>][+-]?\d*\s*$/.test(trimmed)) blockIndent = indent;
     });
     if (!lines.length) return {};
     var pos = 0;
@@ -128,10 +150,17 @@
 
     function isItem(l) { return l.text === '-' || l.text.indexOf('- ') === 0; }
 
-    function block(parentIndent, style) {
+    function block(parentIndent, indicator) {
       var out = [];
       while (pos < n && lines[pos].indent > parentIndent) { out.push(lines[pos].text); pos += 1; }
-      return style === '>' ? out.join(' ') : out.join('\n');
+      var keep = indicator.indexOf('+') !== -1;
+      if (!keep) while (out.length && out[out.length - 1] === '') out.pop();
+      if (indicator[0] === '>') {
+        var paras = [[]];
+        out.forEach(function (l) { if (l === '') paras.push([]); else paras[paras.length - 1].push(l); });
+        return paras.map(function (p) { return p.join(' '); }).join('\n');
+      }
+      return out.join('\n');
     }
 
     function parseNode(indent) { return isItem(lines[pos]) ? parseList(indent) : parseMap(indent); }
@@ -143,16 +172,17 @@
         var kv = splitKey(l.text);
         if (!kv) throw new Error('expected "key: value" at line ' + l.no + ': ' + l.text);
         if (kv.key === '<<') throw new Error('unsupported YAML feature (merge key) at line ' + l.no);
+        if (Object.prototype.hasOwnProperty.call(obj, kv.key)) throw new Error('duplicate key "' + kv.key + '" at line ' + l.no);
         pos += 1;
         if (kv.rest === '') {
           var nx = lines[pos];
-          if (nx && nx.indent > indent) obj[kv.key] = parseNode(nx.indent);
-          else if (nx && nx.indent === indent && isItem(nx)) obj[kv.key] = parseList(indent);
-          else obj[kv.key] = null;
-        } else if (kv.rest === '|' || kv.rest === '>') {
-          obj[kv.key] = block(indent, kv.rest);
+          if (nx && nx.indent > indent) setOwn(obj, kv.key, parseNode(nx.indent));
+          else if (nx && nx.indent === indent && isItem(nx)) setOwn(obj, kv.key, parseList(indent));
+          else setOwn(obj, kv.key, null);
+        } else if (/^[|>][+-]?\d*$/.test(kv.rest)) {
+          setOwn(obj, kv.key, block(indent, kv.rest));
         } else {
-          obj[kv.key] = parseScalar(kv.rest);
+          setOwn(obj, kv.key, parseScalar(kv.rest));
         }
       }
       if (pos < n && lines[pos].indent > indent) throw new Error('unexpected indentation at line ' + lines[pos].no);
@@ -169,9 +199,11 @@
           pos += 1;
           var nx = lines[pos];
           arr.push(nx && nx.indent > indent ? parseNode(nx.indent) : null);
-        } else if (rest === '|' || rest === '>') {
+        } else if (/^[|>][+-]?\d*$/.test(rest)) {
           pos += 1;
           arr.push(block(indent, rest));
+        } else if (rest === '-' || rest.indexOf('- ') === 0) {
+          throw new Error('nested lists are not supported at line ' + l.no);
         } else if (/^([A-Za-z_$][\w.$\/-]*|"[^"]*"|'[^']*'):(\s|$)/.test(rest)) {
           lines[pos] = { indent: indent + offset, text: rest, no: l.no };
           arr.push(parseMap(indent + offset));
@@ -192,14 +224,22 @@
 
   function needsQuote(s) {
     return s === '' || /^\s|\s$/.test(s) || /^[-?:,\[\]{}#&*!|>'"%@`]/.test(s) || /: |:$| #/.test(s) ||
-      /^(true|false|null|~|yes|no|on|off)$/i.test(s) || /^-?\d+(\.\d+)?$/.test(s);
+      /^(true|false|null|~|yes|no|on|off)$/i.test(s) || /^-?\d+(\.\d+)?$/.test(s) || /[\x00-\x1f\x7f]/.test(s);
   }
 
   function dumpScalar(v) {
     if (v === null || v === undefined) return 'null';
     if (typeof v === 'boolean' || typeof v === 'number') return String(v);
     var s = String(v);
-    if (needsQuote(s)) return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n') + '"';
+    if (needsQuote(s)) {
+      return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/[\x00-\x1f\x7f]/g, function (c) {
+        var code = c.charCodeAt(0);
+        if (code === 10) return '\\n';
+        if (code === 9) return '\\t';
+        if (code === 13) return '\\r';
+        return '\\u' + ('000' + code.toString(16)).slice(-4);
+      }) + '"';
+    }
     return s;
   }
 
@@ -246,7 +286,7 @@
 
   /* ---------- GitLab CI model ---------- */
 
-  var RESERVED = ['stages', 'variables', 'default', 'include', 'workflow', 'image', 'services', 'cache', 'before_script', 'after_script'];
+  var RESERVED = ['stages', 'variables', 'default', 'include', 'workflow', 'image', 'services', 'cache', 'before_script', 'after_script', 'spec'];
   var DEFAULT_STAGES = ['.pre', 'build', 'test', 'deploy', '.post'];
 
   // Machine sizes as listed in GitLab's hosted runner documentation. The watt figures are assumptions.
@@ -311,19 +351,63 @@
       if (/deploy|release/i.test(name) || /deploy|release/i.test(stage)) { deferrable = false; reason = 'deploy and release jobs stay on the critical path'; }
       result[name] = { deferrable: deferrable, reason: reason, stage: stage };
     });
-    // a job that another non-deferrable job needs cannot move out of the pipeline
-    jobs.forEach(function (name) {
-      var needs = doc[name].needs;
-      if (!Array.isArray(needs)) return;
-      needs.forEach(function (n) {
-        var target = typeof n === 'string' ? n : (n && n.job);
-        if (target && result[target] && result[target].deferrable && !result[name].deferrable) {
-          result[target].deferrable = false;
-          result[target].reason = 'required by ' + name + ' through needs';
+    // a job that another non-deferrable job needs cannot move out of the pipeline;
+    // the rule repeats until nothing changes, so a chain pins all the way down
+    var edges = depEdges(doc);
+    var changed = true;
+    while (changed) {
+      changed = false;
+      jobs.forEach(function (name) {
+        if (result[name].deferrable) return;
+        (edges[name] || []).forEach(function (target) {
+          if (result[target] && result[target].deferrable) {
+            result[target].deferrable = false;
+            result[target].reason = 'required by ' + name + ' through needs';
+            changed = true;
+          }
+        });
+      });
+    }
+    return result;
+  }
+
+  // edges from each job to the jobs it needs or lists under dependencies
+  function depEdges(doc) {
+    var edges = {};
+    jobsOf(doc).forEach(function (name) {
+      var j = doc[name] || {};
+      var list = [];
+      (Array.isArray(j.needs) ? j.needs : []).forEach(function (n) {
+        var t = typeof n === 'string' ? n : (n && n.job);
+        if (t) list.push(t);
+      });
+      (Array.isArray(j.dependencies) ? j.dependencies : []).forEach(function (t) {
+        if (typeof t === 'string') list.push(t);
+      });
+      edges[name] = list;
+    });
+    return edges;
+  }
+
+  // connected components over the dep edges, counting only deferrable jobs;
+  // jobs tied together must share one window or their needs break the schedule
+  function deferrableGroups(doc, cls) {
+    var edges = depEdges(doc);
+    var members = jobsOf(doc).filter(function (n) { return cls[n].deferrable; });
+    var parent = {};
+    function find(x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; }
+    members.forEach(function (n) { parent[n] = n; });
+    members.forEach(function (name) {
+      (edges[name] || []).forEach(function (t) {
+        if (parent[t] !== undefined) {
+          var ra = find(name), rb = find(t);
+          if (ra !== rb) parent[rb] = ra;
         }
       });
     });
-    return result;
+    var groups = {};
+    members.forEach(function (n) { var r = find(n); (groups[r] = groups[r] || []).push(n); });
+    return Object.keys(groups).map(function (k) { return groups[k]; });
   }
 
   /* ---------- grid carbon intensity (illustrative curves) ---------- */
@@ -364,8 +448,16 @@
 
   function avgIntensity(regionId, startHour, durMin) {
     var steps = Math.max(1, Math.round(durMin));
+    var period = 1440;
+    var full = Math.floor(steps / period);
+    var rem = steps - full * period;
     var sum = 0;
-    for (var s = 0; s < steps; s += 1) sum += intensityAt(regionId, startHour + (s + 0.5) / 60);
+    for (var s = 0; s < rem; s += 1) sum += intensityAt(regionId, startHour + (s + 0.5) / 60);
+    if (full > 0) {
+      var cycle = 0;
+      for (var c = 0; c < period; c += 1) cycle += intensityAt(regionId, startHour + (c + 0.5) / 60);
+      sum += full * cycle;
+    }
     return sum / steps;
   }
 
@@ -382,10 +474,12 @@
     jobsOf(doc).forEach(function (name) {
       var tag = runnerTagOf(doc[name]);
       var t = src[name];
-      if (t && typeof t === 'object') {
+      if (t && typeof t === 'object' && !Array.isArray(t)) {
+        var dur = Number(t.durationMin);
+        var rss = Number(t.peakRssMb);
         out[name] = {
-          durationMin: Number(t.durationMin) || 1,
-          peakRssMb: Number(t.peakRssMb) || 0,
+          durationMin: Number.isFinite(dur) && dur > 0 ? dur : 1,
+          peakRssMb: Number.isFinite(rss) && rss > 0 ? rss : 0,
           avgCpuPct: Math.min(100, Math.max(0, Number(t.avgCpuPct) || 0)),
           peakCpuPct: Math.min(100, Math.max(0, Number(t.peakCpuPct) || Number(t.avgCpuPct) || 0)),
           estimated: false
@@ -410,6 +504,11 @@
     var deferred = o.deferred || {};
     var stages = stageOrder(doc);
     var jobs = jobsOf(doc);
+    // a stage the file uses but never declares still gets simulated, at the end
+    jobs.forEach(function (name) {
+      var s = stageOf(doc[name]);
+      if (stages.indexOf(s) === -1) stages.push(s);
+    });
     var rows = [];
     var cursorMin = 0;
     stages.forEach(function (stage) {
@@ -470,10 +569,14 @@
     return { change: true, from: tag, to: pick, slowdown: round(slowdown, 3), telemetry: newTel, needCores: needCores, needMemMb: Math.round(needMemMb) };
   }
 
-  function findGreenWindow(args) {
-    var wh = args.wh, dur = args.durationMin, baseRegion = args.baseRegion, baseStart = args.baseStart;
-    var maxDelay = args.maxDelayHours, regions = args.regions;
-    var baseG = wh / 1000 * avgIntensity(baseRegion, baseStart, dur);
+  // members: [{wh, durationMin, baseStart}] sharing one window; a group's score is
+  // the sum of each member's carbon at the same start, since they run together
+  function searchWindow(members, o) {
+    var baseRegion = o.baseRegion, regions = o.regions, maxDelay = o.maxDelayHours;
+    var baseG = 0;
+    members.forEach(function (m) { baseG += m.wh / 1000 * avgIntensity(baseRegion, m.baseStart, m.durationMin); });
+    var baseStart = members[0].baseStart;
+    members.forEach(function (m) { baseStart = Math.min(baseStart, m.baseStart); });
     var best = { region: baseRegion, startHour: baseStart, delayHours: 0, g: baseG };
     var evaluated = 0;
     var s0 = Math.ceil(baseStart * 2) / 2;   // windows start on the hour or half hour so cron stays readable
@@ -482,7 +585,8 @@
         evaluated += 1;
         var start = s0 + d;
         var delay = start - baseStart;
-        var g = wh / 1000 * avgIntensity(rid, start, dur);
+        var g = 0;
+        members.forEach(function (m) { g += m.wh / 1000 * avgIntensity(rid, start, m.durationMin); });
         var better = g < best.g - 1e-9 || (Math.abs(g - best.g) <= 1e-9 && delay < best.delayHours);
         if (better) best = { region: rid, startHour: start, delayHours: delay, g: g };
       }
@@ -490,9 +594,18 @@
     return { region: best.region, startHour: best.startHour, delayHours: round(best.delayHours, 2), g: best.g, baseG: baseG, gainPct: baseG ? round((baseG - best.g) / baseG * 100, 2) : 0, evaluated: evaluated };
   }
 
+  function findGreenWindow(args) {
+    return searchWindow(
+      [{ wh: args.wh, durationMin: args.durationMin, baseStart: args.baseStart }],
+      { baseRegion: args.baseRegion, regions: args.regions, maxDelayHours: args.maxDelayHours }
+    );
+  }
+
   function windowId(region, startHour) {
-    var h = Math.floor(((startHour % 24) + 24) % 24);
-    return region + '-' + ('0' + h).slice(-2);
+    var t = ((startHour % 24) + 24) % 24;
+    var h = Math.floor(t);
+    var m = Math.round((t - h) * 60) % 60;
+    return region + '-' + ('0' + h).slice(-2) + ('0' + m).slice(-2);
   }
 
   function cronFor(startHour) {
@@ -593,30 +706,80 @@
     var schedules = {};
     var regions = o.allowRegionShift ? REGIONS.map(function (r) { return r.id; }) : [o.region];
     var preShift = simulatePipeline(patched, effTel, { region: o.region, startHour: o.startHour });
+
     jobNames.forEach(function (name) {
-      if (!cls[name].deferrable) {
-        if (/needs/.test(cls[name].reason)) changes.push({ job: name, type: 'skipped', reason: cls[name].reason });
-        return;
+      if (!cls[name].deferrable && /needs/.test(cls[name].reason)) {
+        changes.push({ job: name, type: 'skipped', reason: cls[name].reason });
       }
-      var row = preShift.rows.filter(function (r) { return r.job === name; })[0];
-      var w = findGreenWindow({ wh: row.wh, durationMin: effTel[name].durationMin, baseRegion: o.region, baseStart: row.startHour, maxDelayHours: o.maxDelayHours, regions: regions });
-      log('find_green_window', { job: name, baseStartHour: round(row.startHour, 2), regions: regions.length, maxDelayHours: o.maxDelayHours }, { region: w.region, startHour: round(w.startHour, 2), gainPct: w.gainPct, evaluated: w.evaluated });
+    });
+
+    deferrableGroups(patched, cls).forEach(function (members) {
+      var alreadyGated = function (name) {
+        var rules = doc[name] && doc[name].rules;
+        return Array.isArray(rules) && rules.some(function (rule) {
+          return rule && typeof rule === 'object' && typeof rule.if === 'string' && rule.if.indexOf('GREEN_WINDOW') !== -1;
+        });
+      };
+      var active = members.filter(function (name) { return !alreadyGated(name); });
+      members.forEach(function (name) {
+        if (alreadyGated(name)) changes.push({ job: name, type: 'kept', reason: 'already on a GREEN_WINDOW schedule' });
+      });
+      if (!active.length) return;
+      var memberRows = active.map(function (name) {
+        var row = preShift.rows.filter(function (r) { return r.job === name; })[0];
+        return { name: name, wh: row.wh, durationMin: effTel[name].durationMin, baseStart: row.startHour };
+      });
+      var w = searchWindow(memberRows, { baseRegion: o.region, regions: regions, maxDelayHours: o.maxDelayHours });
+      log('find_green_window', { jobs: active, baseStartHour: round(Math.min.apply(Math, memberRows.map(function (m) { return m.baseStart; })), 2), regions: regions.length, maxDelayHours: o.maxDelayHours }, { region: w.region, startHour: round(w.startHour, 2), gainPct: w.gainPct, evaluated: w.evaluated });
       if (w.gainPct < o.minGainPct) {
-        changes.push({ job: name, type: 'kept', reason: 'best window saves only ' + w.gainPct + '% (limit ' + o.minGainPct + '%)' });
+        active.forEach(function (name) {
+          changes.push({ job: name, type: 'kept', reason: 'best window saves only ' + w.gainPct + '% (limit ' + o.minGainPct + '%)' });
+        });
         return;
       }
       var wid = windowId(w.region, w.startHour);
-      deferred[name] = { region: w.region, startHour: w.startHour };
-      var job = patched[name];
-      job.rules = [{ if: '$CI_PIPELINE_SOURCE == "schedule" && $GREEN_WINDOW == "' + wid + '"' }];
-      var moved = w.region !== o.region;
-      if (moved) {
-        var tag = runnerTagOf(patched[name]);
-        var size = tag.replace(/^saas-linux-/, '').replace(/-amd64$/, '');
-        job.tags = ['green-' + w.region + '-' + size];
-      }
+      var inGroup = {};
+      active.forEach(function (name) { inGroup[name] = true; });
+      active.forEach(function (name) {
+        deferred[name] = { region: w.region, startHour: w.startHour };
+        var job = patched[name];
+        // a scheduled pipeline has no other jobs in it, so needs and dependencies
+        // may only point at jobs sharing this window; the rest would fail the run
+        var droppedNeeds = 0;
+        if (Array.isArray(job.needs)) {
+          var keptN = job.needs.filter(function (n) { var t = typeof n === 'string' ? n : (n && n.job); return t && inGroup[t]; });
+          droppedNeeds += job.needs.length - keptN.length;
+          if (keptN.length) job.needs = keptN; else delete job.needs;
+        }
+        if (Array.isArray(job.dependencies)) {
+          var keptD = job.dependencies.filter(function (t) { return inGroup[t]; });
+          droppedNeeds += job.dependencies.length - keptD.length;
+          if (keptD.length) job.dependencies = keptD; else delete job.dependencies;
+        }
+        // only and except cannot sit next to rules in one job, and old rules are
+        // replaced by the window gate plus an explicit never for everything else
+        delete job.only;
+        delete job.except;
+        job.rules = [
+          { if: '$CI_PIPELINE_SOURCE == "schedule" && $GREEN_WINDOW == "' + wid + '"' },
+          { when: 'never' }
+        ];
+        var moved = w.region !== o.region;
+        if (moved) {
+          var tag = runnerTagOf(patched[name]);
+          var size = tag.replace(/^saas-linux-/, '').replace(/-amd64$/, '');
+          job.tags = ['green-' + w.region + '-' + size];
+        }
+        changes.push({
+          job: name, type: moved ? 'shift-region' : 'shift-time', window: wid, region: w.region,
+          startHour: round(w.startHour, 2), delayHours: w.delayHours, gainPct: w.gainPct,
+          originalRules: doc[name].rules || null,
+          removedGate: doc[name].only !== undefined || doc[name].except !== undefined,
+          droppedNeeds: droppedNeeds || undefined,
+          groupedWith: active.length > 1 ? active.filter(function (x) { return x !== name; }) : undefined
+        });
+      });
       schedules[wid] = { id: wid, cron: cronFor(w.startHour), timezone: 'UTC', variables: { GREEN_WINDOW: wid }, region: w.region };
-      changes.push({ job: name, type: moved ? 'shift-region' : 'shift-time', window: wid, region: w.region, startHour: round(w.startHour, 2), delayHours: w.delayHours, gainPct: w.gainPct, originalRules: doc[name].rules || null });
     });
 
     var after = simulatePipeline(patched, effTel, { region: o.region, startHour: o.startHour, deferred: deferred });
@@ -669,6 +832,8 @@
     return (saved > 0 ? '-' : '+') + Math.abs(pct) + '%';
   }
 
+  function mdSafe(v) { return String(v).replace(/[\r\n`]+/g, ' ').trim(); }
+
   function buildMrReport(r) {
     var s = r.savings;
     var L = [];
@@ -685,11 +850,15 @@
     L.push('### Changes');
     var any = false;
     r.changes.forEach(function (c) {
-      if (c.type === 'rightsize') { any = true; L.push('- `' + c.job + '`: runner `' + c.from + '` to `' + c.to + '` (predicted slowdown x' + c.slowdown + ')'); }
-      else if (c.type === 'shift-time') { any = true; L.push('- `' + c.job + '`: runs on a schedule at window `' + c.window + '` (' + c.delayHours + ' h later), estimated ' + c.gainPct + '% less carbon for this job'); }
-      else if (c.type === 'shift-region') { any = true; L.push('- `' + c.job + '`: moved to region `' + c.region + '` (window `' + c.window + '`), estimated ' + c.gainPct + '% less carbon for this job'); }
-      else if (c.type === 'kept') L.push('- `' + c.job + '`: left as is, ' + c.reason);
-      else if (c.type === 'skipped') L.push('- `' + c.job + '`: not moved, ' + c.reason);
+      var job = mdSafe(c.job);
+      if (c.type === 'rightsize') { any = true; L.push('- `' + job + '`: runner `' + mdSafe(c.from) + '` to `' + mdSafe(c.to) + '` (predicted slowdown x' + c.slowdown + ')'); }
+      else if (c.type === 'shift-time') { any = true; L.push('- `' + job + '`: runs on a schedule at window `' + mdSafe(c.window) + '` (' + c.delayHours + ' h later), estimated ' + c.gainPct + '% less carbon for this job'); }
+      else if (c.type === 'shift-region') { any = true; L.push('- `' + job + '`: moved to region `' + mdSafe(c.region) + '` (window `' + mdSafe(c.window) + '`), estimated ' + c.gainPct + '% less carbon for this job'); }
+      else if (c.type === 'kept') L.push('- `' + job + '`: left as is, ' + mdSafe(c.reason));
+      else if (c.type === 'skipped') L.push('- `' + job + '`: not moved, ' + mdSafe(c.reason));
+      if (c.groupedWith) L.push('  - shares its window with ' + c.groupedWith.map(mdSafe).join(', ') + ' so their `needs` order stays intact');
+      if (c.droppedNeeds) L.push('  - dropped ' + c.droppedNeeds + ' `needs`/`dependencies` entries that pointed at jobs not on this schedule');
+      if (c.removedGate) L.push('  - removed an `only`/`except` gate, which GitLab does not allow next to `rules`');
     });
     if (!any) L.push('- No beneficial change found.');
     if (r.schedules.length) {
@@ -701,7 +870,8 @@
     L.push('### Review before merging');
     L.push('- Deferred jobs no longer gate this pipeline. If a scan must block merges, keep it in the pipeline.');
     if (r.changes.some(function (c) { return c.type === 'shift-region'; })) L.push('- Region moves use tags such as `green-europe-north1-small`, which need self-managed runners in that region. Check data residency rules first.');
-    if (r.estimatedJobs.length) L.push('- No telemetry for: ' + r.estimatedJobs.join(', ') + '. Those jobs were never resized and use a default estimate.');
+    if (r.changes.some(function (c) { return c.originalRules; })) L.push('- Some deferred jobs had their own `rules`; those were replaced by the window gate and are shown in the diff.');
+    if (r.estimatedJobs.length) L.push('- No telemetry for: ' + r.estimatedJobs.map(mdSafe).join(', ') + '. Those jobs were never resized and use a default estimate.');
     L.push('- Rollback: revert this merge request. The original file is preserved in git history.');
     L.push('');
     L.push('Model: ' + MODEL.wattsPerVcpu + ' W per vCPU at full load, ' + Math.round(MODEL.idleFraction * 100) + '% idle floor, PUE ' + MODEL.pue + ', synthetic grid curves.');

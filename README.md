@@ -4,15 +4,17 @@ A hands-off, carbon-aware optimizer for GitLab CI/CD pipelines. Paste a `.gitlab
 
 Live demo: https://aariv.me/green-runner/
 
+![GreenRunner after a region-shift run: the 24-hour carbon curves, the job moves and the merge request report](screenshots/01-hero.png)
+
 This is a second entry for GitLab Transcend: Life After Code. It is aimed at Path A (a fresh hands-off agent for the stages after code is written) and the Most Environmentally Impactful category. That is the intent, not a claim about any outcome.
 
 ## What it does
 
 1. Reads the pipeline with a small zero-dependency YAML reader (and writer) built for the `.gitlab-ci.yml` subset: maps, lists, lists of maps, inline lists, quoted strings, block scalars, comments.
-2. Classifies jobs. Names or stages containing `fuzz`, `container_scanning`, `dast`, `benchmark` or `pages-nightly` are deferrable. Deploy and release jobs, and any job another job lists under `needs`, are pinned.
+2. Classifies jobs. Names or stages containing `fuzz`, `container_scanning`, `dast`, `benchmark` or `pages-nightly` are deferrable. Deploy and release jobs, and any job reachable from a pinned job through `needs` or `dependencies`, are pinned.
 3. Simulates energy in watt-hours from runner size, duration, CPU and memory, then carbon in grams of CO2 equivalent from a 24-hour grid intensity curve for 6 regions.
-4. Right-sizes runner tags such as `saas-linux-large-amd64` to `saas-linux-small-amd64` from peak CPU and memory telemetry, with 20% CPU and 30% memory headroom and a slowdown guard.
-5. Replaces the `rules` of deferrable jobs with a scheduled-pipeline rule for the greenest window within a delay limit, optionally in a lower-carbon region, and lists the pipeline schedules to create.
+4. Right-sizes runner tags such as `saas-linux-large-amd64` to `saas-linux-small-amd64` from peak CPU and memory telemetry, with 20% CPU and 30% memory headroom and a slowdown guard (`--max-slowdown` sets the limit).
+5. Gives deferrable jobs a scheduled-pipeline `rules` gate for the greenest window within a delay limit, optionally in a lower-carbon region, and lists the pipeline schedules to create. Jobs tied together by `needs` share one window and keep their ordering; `needs` pointing outside the schedule and any `only`/`except` gates are removed, since GitLab does not allow them alongside `rules`.
 6. Shows a side-by-side YAML patch, a per-job table, an agent trace, and a Markdown merge request report.
 
 The same engine runs in the page and from the command line:

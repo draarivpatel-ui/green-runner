@@ -8,12 +8,13 @@ const fs = require('node:fs');
 const G = require('./engine.js');
 
 function parseArgs(argv) {
-  const a = { file: null, telemetry: null, region: null, hour: null, regionShift: false, write: null, report: null, json: false, help: false };
+  const a = { file: null, telemetry: null, region: null, hour: null, maxSlowdown: null, regionShift: false, write: null, report: null, json: false, help: false };
   for (let i = 0; i < argv.length; i += 1) {
     const v = argv[i];
     if (v === '--telemetry') a.telemetry = argv[++i];
     else if (v === '--region') a.region = argv[++i];
     else if (v === '--hour') a.hour = Number(argv[++i]);
+    else if (v === '--max-slowdown') a.maxSlowdown = Number(argv[++i]);
     else if (v === '--region-shift') a.regionShift = true;
     else if (v === '--write') a.write = argv[++i];
     else if (v === '--report') a.report = argv[++i];
@@ -30,6 +31,7 @@ const USAGE = [
   '  --telemetry <file.json>   per-job durationMin, peakRssMb, avgCpuPct, peakCpuPct',
   '  --region <id>             baseline region (default us-central1)',
   '  --hour <0-23>             pipeline start hour in UTC (default 19)',
+  '  --max-slowdown <n>        reject downsizing that would slow a job more than this (default 1.15)',
   '  --region-shift            allow moving deferrable jobs to a lower-carbon region',
   '  --write <file>            write the patched .gitlab-ci.yml',
   '  --report <file>           write the markdown report instead of printing it',
@@ -48,7 +50,14 @@ function main(argv, io) {
   }
   const opts = { allowRegionShift: args.regionShift };
   if (args.region) opts.region = args.region;
-  if (args.hour !== null && !Number.isNaN(args.hour)) opts.startHour = args.hour;
+  if (args.hour !== null) {
+    if (!Number.isInteger(args.hour) || args.hour < 0 || args.hour > 23) { out.err('--hour must be an integer from 0 to 23'); return 2; }
+    opts.startHour = args.hour;
+  }
+  if (args.maxSlowdown !== null) {
+    if (!Number.isFinite(args.maxSlowdown) || args.maxSlowdown < 1) { out.err('--max-slowdown must be a number of at least 1'); return 2; }
+    opts.maxSlowdown = args.maxSlowdown;
+  }
   if (opts.region && !G.REGIONS.some((r) => r.id === opts.region)) { out.err('unknown region ' + opts.region); return 2; }
   const result = G.runGreenAgent(yaml, telemetry, opts);
   if (!result.ok) { out.err('parse error: ' + result.error); return 1; }
