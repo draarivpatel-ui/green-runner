@@ -100,6 +100,88 @@
       <ul id="schedule-list" class="plain"></ul>
     </section>
   </div>
+
+  <div class="lab-span">
+    <section class="panel lab" id="gr-lab-section" aria-labelledby="h-grlab" hidden>
+      <h2 id="h-grlab">Carbon Pareto &amp; Guardrail Lab</h2>
+
+      <div class="lab-controls">
+        <label class="field" for="gr-preset"><span>Preset</span>
+          <select id="gr-preset"></select>
+        </label>
+        <label class="field" for="gr-region"><span>Baseline region</span>
+          <select id="gr-region"></select>
+        </label>
+        <label class="field" for="gr-start"><span>Launch hour <b id="gr-start-out" class="tabular">19:00</b> UTC</span>
+          <input id="gr-start" type="range" min="0" max="23" step="1" value="19">
+        </label>
+        <label class="field" for="gr-delay"><span>Max delay <b id="gr-delay-out" class="tabular">14 h</b></span>
+          <input id="gr-delay" type="range" min="0" max="24" step="0.5" value="14">
+        </label>
+        <label class="field" for="gr-slowdown"><span>Slowdown budget <b id="gr-slowdown-out" class="tabular">15%</b></span>
+          <input id="gr-slowdown" type="range" min="0" max="50" step="1" value="15">
+        </label>
+      </div>
+
+      <fieldset class="lab-policies">
+        <legend>Optimization policy</legend>
+        <label for="gr-policy-baseline"><input type="radio" name="gr-policy" id="gr-policy-baseline" value="baseline"> Baseline, no changes</label>
+        <label for="gr-policy-right-size-only"><input type="radio" name="gr-policy" id="gr-policy-right-size-only" value="right-size-only"> Right-size only</label>
+        <label for="gr-policy-time-shift-only"><input type="radio" name="gr-policy" id="gr-policy-time-shift-only" value="time-shift-only"> Time shift only</label>
+        <label for="gr-policy-hands-off-local"><input type="radio" name="gr-policy" id="gr-policy-hands-off-local" value="hands-off-local" checked> Hands-off, same region</label>
+        <label for="gr-policy-region-plus-time"><input type="radio" name="gr-policy" id="gr-policy-region-plus-time" value="region-plus-time"> Region plus time shift</label>
+      </fieldset>
+
+      <div class="lab-grid">
+        <div class="lab-card">
+          <h3 class="sub">Five policies on <span id="gr-comparator-preset">preset</span></h3>
+          <div class="diff-wrap lab-wrap-scroll"><table class="jobs lab-table" aria-label="Five policy comparison for the selected preset">
+            <thead><tr><th scope="col">Policy</th><th scope="col" class="num">Wh</th><th scope="col" class="num">gCO2e</th><th scope="col" class="num">Saved</th><th scope="col" class="num">Max job slowdown</th><th scope="col" class="num">Changes</th><th scope="col">Pinned</th><th scope="col">Patch</th><th scope="col">Gates</th></tr></thead>
+            <tbody id="gr-comparator-body"></tbody>
+          </table></div>
+          <button id="gr-load-preset" class="btn ghost" type="button">Load Preset into Editor</button>
+
+          <h3 class="sub">Carbon saved %, every preset</h3>
+          <div class="diff-wrap lab-wrap-scroll"><table class="jobs lab-table" aria-label="Carbon saved percent for every preset and policy">
+            <thead><tr><th scope="col">Preset</th><th scope="col" class="num">Baseline</th><th scope="col" class="num">Right-size</th><th scope="col" class="num">Time shift</th><th scope="col" class="num">Hands-off</th><th scope="col" class="num">Region + time</th></tr></thead>
+            <tbody id="gr-matrix-body"></tbody>
+          </table></div>
+        </div>
+
+        <div class="lab-card">
+          <h3 class="sub">24-hour grid intensity, six regions</h3>
+          <div id="gr-curves-chart" class="lab-chart"></div>
+          <h3 class="sub">Carbon saved vs slowdown budget</h3>
+          <div id="gr-pareto-chart" class="lab-chart"></div>
+          <div class="diff-wrap lab-wrap-scroll"><table class="jobs lab-table" id="gr-delay-table" aria-label="Carbon saved percent against max delay hours"></table></div>
+          <h3 class="sub">Greenest launch hour per region</h3>
+          <div class="diff-wrap lab-wrap-scroll"><table class="jobs lab-table" aria-label="Greenest launch hour per region">
+            <thead><tr><th scope="col">Region</th><th scope="col" class="num">UTC hour</th><th scope="col" class="num">gCO2e</th><th scope="col" class="num">vs launch hour</th></tr></thead>
+            <tbody id="gr-greenest-body"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <div class="lab-audit">
+        <p class="lab-digest"><span>Carbon brief integrity</span> <code id="gr-digest-line" class="tabular">sha256:pending</code> <span id="gr-verify-status" class="tabular"></span></p>
+        <div class="lab-actions">
+          <button id="gr-export-json" class="btn ghost" type="button">Export JSON</button>
+          <button id="gr-export-csv" class="btn ghost" type="button">Export CSV</button>
+          <button id="gr-export-md" class="btn ghost" type="button">Export Markdown</button>
+          <button id="gr-copy-share" class="btn ghost" type="button">Copy Share Link</button>
+          <button id="gr-verify" class="btn ghost" type="button">Verify Digest</button>
+          <button id="gr-tamper" class="btn ghost" type="button">Tamper + Re-Verify</button>
+          <button id="gr-run-tests" class="btn primary" type="button">Run In-Page Checks</button>
+        </div>
+        <label class="field" for="gr-share-url"><span>Bookmark link</span>
+          <input id="gr-share-url" type="text" readonly value="" aria-label="Bookmarkable share URL carrying the lab state">
+        </label>
+        <pre id="gr-export-preview" class="report" hidden></pre>
+        <p id="gr-selftest-summary" class="tabular">Deterministic in-page checks are ready to run.</p>
+        <ol id="gr-selftest-list" class="lab-selftest-list"></ol>
+      </div>
+    </section>
+  </div>
 </main>
 
 <footer class="foot">
@@ -107,6 +189,7 @@
 </footer>
 
 <script src="engine.js"></script>
+<script src="carbon-lab.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

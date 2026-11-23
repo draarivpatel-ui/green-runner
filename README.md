@@ -16,6 +16,7 @@ This is a second entry for GitLab Transcend: Life After Code. It is aimed at Pat
 4. Right-sizes runner tags such as `saas-linux-large-amd64` to `saas-linux-small-amd64` from peak CPU and memory telemetry, with 20% CPU and 30% memory headroom and a slowdown guard (`--max-slowdown` sets the limit).
 5. Gives deferrable jobs a scheduled-pipeline `rules` gate for the greenest window within a delay limit, optionally in a lower-carbon region, and lists the pipeline schedules to create. Jobs tied together by `needs` share one window and keep their ordering; `needs` pointing outside the schedule and any `only`/`except` gates are removed, since GitLab does not allow them alongside `rules`.
 6. Shows a side-by-side YAML patch, a per-job table, an agent trace, and a Markdown merge request report.
+7. Runs a Carbon Pareto & Guardrail Lab on the page: a 5-policy x 6-preset comparator driven by real agent runs, six-region 24-hour intensity curves, a carbon-saved vs slowdown-budget Pareto frontier, a max-delay sweep, a greenest launch hour per region, SHA-256-audited brief exports (JSON, spreadsheet-safe CSV, Markdown), a `#gr=` shareable bookmark hash, and 22 in-page deterministic checks.
 
 The same engine runs in the page and from the command line:
 
@@ -32,6 +33,7 @@ node cli.js examples/node-webapp.gitlab-ci.yml --telemetry examples/node-webapp.
 | Path | Purpose |
 | --- | --- |
 | `engine.js` | YAML reader and writer, energy and carbon model, agent, diff, report, six presets |
+| `carbon-lab.js` | The lab: policy comparator, sweeps, SHA-256 brief exports, `#gr=` codec, in-page checks |
 | `app.js`, `index.html`, `styles.css` | The page, with a canvas of the 24-hour curves and job moves |
 | `cli.js` | Command line over the same engine |
 | `.gitlab-ci.yml` | This project's own pipeline: tests, plus a merge request job that runs the agent and keeps its report as an artifact |
@@ -54,11 +56,11 @@ node cli.js examples/node-webapp.gitlab-ci.yml --telemetry examples/node-webapp.
 npm test
 ```
 
-This runs `node --test` with no installs. `tests/engine.test.js` covers the YAML reader and writer (including round trips of every preset and this repository's own pipeline), the energy model, right-sizing, window search, the agent's guardrails, the report and the command line. `tests/dom-smoke.test.js` checks the markup, drives the controller on a small fake DOM, and scans every file for dashes, emoji, uppercase kickers, credential-shaped strings and private details.
+This runs `node --test` with no installs: **416 tests, all passing** as of this revision. `tests/engine.test.js` (80 tests) covers the YAML reader and writer (including round trips of every preset and this repository's own pipeline), the energy model, right-sizing, window search, the agent's guardrails, the report and the command line. `tests/dom-smoke.test.js` (34 tests) checks the markup, drives the controller on a small fake DOM, and scans every file for dashes, emoji, uppercase kickers, credential-shaped strings and private details. `tests/carbon-lab.test.js` (302 tests) drives the whole lab: SHA-256 vectors, canonical JSON, CSV injection escaping, hostile `#gr=` hashes including `__proto__` keys, every one of the 30 policy-preset cells, sweep monotonicity, digest parity across the page line and all three exports, tamper detection, bookmark restore and controller delegation.
 
 ## Verification & authorship
 
-The model, presets, telemetry values and documents are deterministically tested locally. Aariv Patel authored the project and owns the repository.
+Verified locally on this revision: **416/416** `node --test` checks pass, the lab's **22/22** in-page deterministic checks pass, and a zero-dependency headless-Chromium audit (Node HTTP server + CDP, real pointer input) passes **69/69** checks at 1440x900 and 390x844 with 0 console errors, 0 page exceptions, 0 external requests and 0 horizontal overflow. The Hark honesty harness reports 0 violations and no em or en dashes exist in tracked files. The model, presets, telemetry values and documents are deterministically tested locally. Aariv Patel authored the project and owns the repository.
 
 ## License
 

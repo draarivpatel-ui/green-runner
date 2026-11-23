@@ -6,7 +6,7 @@
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.GreenRunnerApp = factory();
-}(typeof self !== 'undefined' ? self : this, function () {
+}(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this), function () {
   'use strict';
 
   var REGION_COLORS = { 'us-central1': '#ffd166', 'europe-north1': '#6bb5ff', 'us-west1': '#c792ea', 'europe-west4': '#ff9f68', 'asia-southeast1': '#ff6b6b', 'southamerica-east1': '#8cf26b' };
@@ -104,14 +104,21 @@
 
   /* ---------- controller ---------- */
 
-  function createController(engine, doc) {
+  function shareBase() {
+    return typeof location !== 'undefined' && location && location.href ? location.href.split('#')[0] : '';
+  }
+
+  function createController(engine, doc, lab) {
     var els = {};
     function $(id) { if (!els[id]) els[id] = doc.getElementById(id); return els[id]; }
     function setHTML(id, html) { var e = $(id); if (e) e.innerHTML = html; }
     function setText(id, text) { var e = $(id); if (e) e.textContent = text; }
+    function setTone(id, tone) { var e = $(id); if (e && e.setAttribute) e.setAttribute('data-tone', tone); }
 
     var ctl = {
       engine: engine,
+      lab: lab || null,
+      labState: lab ? lab.normalizeLabState({}) : null,
       presetId: null,
       yaml: '',
       telemetryText: '{}',
@@ -287,6 +294,164 @@
       if (apply) apply.disabled = !(ctl.result && ctl.result.ok);
     };
 
+    /* ----- Carbon Pareto & Guardrail Lab ----- */
+
+    var LAB_KEYS = { presetId: true, policyId: true, regionId: true, maxDelayHours: true, maxSlowdownPct: true, startHour: true };
+
+    ctl.renderLab = function () {
+      var lab = ctl.lab;
+      if (!lab) return;
+      var section = $('gr-lab-section');
+      if (section) section.hidden = false;
+      var st = ctl.labState;
+      var ps = $('gr-preset'), rg = $('gr-region');
+      if (ps && !ps.innerHTML) ps.innerHTML = lab.renderPresetOptionsHtml();
+      if (rg && !rg.innerHTML) rg.innerHTML = lab.renderRegionOptionsHtml();
+      if (ps) ps.value = st.presetId;
+      if (rg) rg.value = st.regionId;
+      var start = $('gr-start'), delay = $('gr-delay'), slow = $('gr-slowdown');
+      if (start) start.value = String(st.startHour);
+      if (delay) delay.value = String(st.maxDelayHours);
+      if (slow) slow.value = String(st.maxSlowdownPct);
+      setText('gr-start-out', ('0' + st.startHour).slice(-2) + ':00');
+      setText('gr-delay-out', st.maxDelayHours + ' h');
+      setText('gr-slowdown-out', st.maxSlowdownPct + '%');
+      lab.LAB_POLICIES.forEach(function (p) {
+        var radio = $('gr-policy-' + p.id);
+        if (radio) radio.checked = p.id === st.policyId;
+      });
+      var preset = engine.getPreset(st.presetId);
+      setText('gr-comparator-preset', preset ? preset.name : st.presetId);
+      setHTML('gr-comparator-body', lab.renderComparatorRowsHtml(st));
+      setHTML('gr-matrix-body', lab.renderPresetMatrixRowsHtml(st));
+      setHTML('gr-curves-chart', lab.renderCurvesSvg(st));
+      setHTML('gr-pareto-chart', lab.renderParetoSvg(st));
+      setHTML('gr-delay-table', lab.renderDelaySweepTableHtml(st));
+      setHTML('gr-greenest-body', lab.renderGreenestRowsHtml(st));
+      var stamped = lab.getStampedReport(st);
+      setText('gr-digest-line', 'sha256:' + stamped.digestHex);
+      var share = $('gr-share-url');
+      if (share) share.value = shareBase() + lab.encodeLabHash(st);
+    };
+
+    ctl.setLabOption = function (key, value) {
+      if (!ctl.lab || !Object.prototype.hasOwnProperty.call(LAB_KEYS, key)) return false;
+      var next = {};
+      Object.keys(ctl.labState).forEach(function (k) { next[k] = ctl.labState[k]; });
+      next[key] = value;
+      ctl.labState = ctl.lab.normalizeLabState(next);
+      ctl.renderLab();
+      return true;
+    };
+
+    function labDelegate(e) {
+      if (!ctl.lab) return;
+      var t = e && e.target;
+      if (!t || typeof t.closest !== 'function' || typeof t.getAttribute !== 'function') return;
+      var pick = t.closest('[data-gr-pick-policy]');
+      if (pick) {
+        var pid = pick.getAttribute('data-gr-pick-policy');
+        var prid = pick.getAttribute('data-gr-pick-preset');
+        if (prid) ctl.setLabOption('presetId', prid);
+        if (pid) ctl.setLabOption('policyId', pid);
+        return;
+      }
+      var policyRow = t.closest('tr[data-policy-id]');
+      if (policyRow) { ctl.setLabOption('policyId', policyRow.getAttribute('data-policy-id')); return; }
+      var presetRow = t.closest('tr[data-preset-id]');
+      if (presetRow) { ctl.setLabOption('presetId', presetRow.getAttribute('data-preset-id')); return; }
+      var regionRow = t.closest('tr[data-region-id]');
+      if (regionRow) { ctl.setLabOption('regionId', regionRow.getAttribute('data-region-id')); return; }
+      var regionPoint = t.closest('[data-gr-region]');
+      if (regionPoint) { ctl.setLabOption('regionId', regionPoint.getAttribute('data-gr-region')); }
+    }
+
+    function labDownload(name, text) {
+      if (typeof document === 'undefined' || !document.createElement || !document.body) return;
+      if (typeof URL === 'undefined' || !URL.createObjectURL || typeof Blob === 'undefined') return;
+      try {
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 500);
+      } catch (e) { /* download is best effort; the preview still carries the export */ }
+    }
+
+    ctl.labAction = function (action) {
+      var lab = ctl.lab;
+      if (!lab) return false;
+      var st = ctl.labState;
+      if (action === 'load-preset') return ctl.loadPreset(st.presetId);
+      if (action === 'export-json' || action === 'export-csv' || action === 'export-md') {
+        var names = { 'export-json': 'greenrunner-brief.json', 'export-csv': 'greenrunner-brief.csv', 'export-md': 'greenrunner-brief.md' };
+        var body = action === 'export-json' ? lab.exportReportJson(st) : (action === 'export-csv' ? lab.exportReportCsv(st) : lab.exportReportMarkdown(st));
+        var prev = $('gr-export-preview');
+        if (prev) { prev.hidden = false; prev.textContent = body; }
+        setText('gr-verify-status', 'Exported ' + names[action] + ' (' + body.length + ' chars).');
+        setTone('gr-verify-status', 'ok');
+        labDownload(names[action], body);
+        return true;
+      }
+      if (action === 'copy-share') {
+        var url = shareBase() + lab.encodeLabHash(st);
+        var field = $('gr-share-url');
+        if (field) { field.value = url; if (field.select) field.select(); }
+        var done = function () { setText('gr-verify-status', 'Share link copied to clipboard.'); };
+        var fail = function () { setText('gr-verify-status', 'Share link shown in the field; clipboard unavailable.'); };
+        if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, fail);
+        else fail();
+        setTone('gr-verify-status', 'ok');
+        return true;
+      }
+      if (action === 'verify') {
+        var v = lab.verifyStampedReport(lab.getStampedReport(st));
+        setText('gr-verify-status', v.ok ? 'VERIFIED ' + v.actual.slice(0, 20) : 'DIGEST MISMATCH ' + v.actual.slice(0, 20));
+        setTone('gr-verify-status', v.ok ? 'ok' : 'bad');
+        return v.ok;
+      }
+      if (action === 'tamper') {
+        var stamped = lab.getStampedReport(st);
+        var tampered = JSON.parse(JSON.stringify(stamped.payload));
+        tampered.inputs.maxSlowdownPct = tampered.inputs.maxSlowdownPct === 50 ? 49 : 50;
+        var verdict = lab.verifyStampedReport({ payload: tampered, digestHex: stamped.digestHex });
+        setText('gr-verify-status', verdict.ok ? 'TAMPER MISSED' : 'TAMPER DETECTED: slowdown ' + stamped.payload.inputs.maxSlowdownPct + '% rewritten to ' + tampered.inputs.maxSlowdownPct + '%');
+        setTone('gr-verify-status', 'bad');
+        return true;
+      }
+      if (action === 'run-tests') {
+        var results = lab.runLabSelfTests(st);
+        var passed = results.filter(function (r) { return r.pass; }).length;
+        var sum = $('gr-selftest-summary');
+        if (sum) {
+          sum.textContent = passed + '/' + results.length + ' in-page checks passing.';
+          if (sum.setAttribute) sum.setAttribute('data-tone', passed === results.length ? 'ok' : 'bad');
+        }
+        setHTML('gr-selftest-list', results.map(function (r) {
+          return '<li class="' + (r.pass ? 'lab-test-pass' : 'lab-test-fail') + '"><b>' + (r.pass ? 'PASS' : 'FAIL') + '</b> ' + esc(r.name) + '. ' + esc(r.detail) + '</li>';
+        }).join(''));
+        return results;
+      }
+      return false;
+    };
+
+    ctl.applyLabBookmark = function (hash) {
+      if (!ctl.lab) return false;
+      var decoded = ctl.lab.decodeLabHash(hash);
+      if (!decoded) { ctl.renderLab(); return false; }
+      ctl.labState = decoded;
+      ctl.loadPreset(decoded.presetId);
+      return true;
+    };
+
+    ctl.restoreLabBookmark = function () {
+      if (!ctl.lab) return;
+      if (typeof location === 'undefined' || !location.hash) return;
+      ctl.applyLabBookmark(location.hash);
+    };
+
     ctl.render = function () {
       var ps = $('preset-select');
       if (ps && !ps.innerHTML) ps.innerHTML = engine.PRESETS.map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + '</option>'; }).join('');
@@ -299,6 +464,7 @@
       ctl.renderJobs();
       ctl.renderTrace();
       ctl.renderReport();
+      ctl.renderLab();
     };
 
     ctl.bind = function () {
@@ -313,11 +479,32 @@
       on('opt-hour', 'input', function (e) { ctl.setOption('startHour', e.target.value); });
       on('opt-delay', 'input', function (e) { ctl.setOption('maxDelayHours', e.target.value); });
       on('opt-region-shift', 'change', function (e) { ctl.setOption('allowRegionShift', e.target.checked); });
+      if (ctl.lab) {
+        on('gr-preset', 'change', function (e) { ctl.setLabOption('presetId', e.target.value); });
+        on('gr-region', 'change', function (e) { ctl.setLabOption('regionId', e.target.value); });
+        on('gr-start', 'input', function (e) { ctl.setLabOption('startHour', e.target.value); });
+        on('gr-delay', 'input', function (e) { ctl.setLabOption('maxDelayHours', e.target.value); });
+        on('gr-slowdown', 'input', function (e) { ctl.setLabOption('maxSlowdownPct', e.target.value); });
+        on('gr-lab-section', 'click', labDelegate);
+        on('gr-lab-section', 'keydown', function (e) { if (e && e.key === 'Enter') labDelegate(e); });
+        ctl.lab.LAB_POLICIES.forEach(function (p) {
+          on('gr-policy-' + p.id, 'change', function (e) { if (e.target.checked) ctl.setLabOption('policyId', p.id); });
+        });
+        on('gr-load-preset', 'click', function () { ctl.labAction('load-preset'); });
+        on('gr-export-json', 'click', function () { ctl.labAction('export-json'); });
+        on('gr-export-csv', 'click', function () { ctl.labAction('export-csv'); });
+        on('gr-export-md', 'click', function () { ctl.labAction('export-md'); });
+        on('gr-copy-share', 'click', function () { ctl.labAction('copy-share'); });
+        on('gr-verify', 'click', function () { ctl.labAction('verify'); });
+        on('gr-tamper', 'click', function () { ctl.labAction('tamper'); });
+        on('gr-run-tests', 'click', function () { ctl.labAction('run-tests'); });
+      }
     };
 
     ctl.init = function () {
       ctl.bind();
       ctl.loadPreset(engine.PRESETS[0].id);
+      ctl.restoreLabBookmark();
       return ctl;
     };
 
@@ -327,7 +514,7 @@
   var api = { createController: createController, drawCarbon: drawCarbon, esc: esc, REGION_COLORS: REGION_COLORS };
 
   if (typeof document !== 'undefined' && typeof window !== 'undefined' && window.GreenRunner) {
-    api.app = createController(window.GreenRunner, document).init();
+    api.app = createController(window.GreenRunner, document, window.GreenRunnerLab || null).init();
   }
   return api;
 }));

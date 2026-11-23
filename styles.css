@@ -153,8 +153,72 @@ table { border-collapse: collapse; width: 100%; font-size: 0.78rem; }
 
 .foot { padding: 4px clamp(14px, 3vw, 32px) 30px; color: var(--muted); font-size: 0.8rem; max-width: 900px; }
 
+/* ---------- Carbon Pareto & Guardrail Lab ---------- */
+
+.lab-span { grid-column: 1 / -1; min-width: 0; }
+.lab-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0 14px; }
+.lab-controls input[type="range"] { width: 100%; accent-color: var(--lime); min-height: 44px; }
+.lab-controls b { color: var(--lime); font-weight: 650; }
+
+.lab-policies {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  padding: 8px 14px 10px;
+  margin: 0 0 16px;
+}
+.lab-policies legend { color: var(--muted); font-size: 0.78rem; padding: 0 6px; }
+.lab-policies label { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 0.85rem; cursor: pointer; }
+.lab-policies input { width: 18px; height: 18px; accent-color: var(--lime); }
+
+.lab-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.lab-card { min-width: 0; }
+.lab-wrap-scroll { max-height: 360px; margin-bottom: 12px; }
+.lab-table { font-size: 0.76rem; }
+.tabular { font-variant-numeric: tabular-nums; }
+
+.lab-policy-row, .lab-preset-row, .lab-region-row { cursor: pointer; }
+.lab-policy-row.is-selected td, .lab-policy-row.is-selected th,
+.lab-preset-row.is-selected td, .lab-preset-row.is-selected th,
+.lab-region-row.is-selected td, .lab-region-row.is-selected th { background: rgba(140, 242, 107, 0.09); }
+.lab-cell-sel { box-shadow: inset 0 0 0 1px var(--lime); }
+.lab-region-id { color: var(--muted); font-family: var(--mono); font-size: 0.7rem; font-weight: 400; }
+
+.lab-pill-ok { color: var(--lime); border-color: var(--lime); }
+.lab-pill-bad { color: var(--red); border-color: var(--red); }
+
+.lab-chart { border: 1px solid var(--line); border-radius: 10px; background: #071a10; margin-bottom: 14px; overflow: hidden; }
+.lab-chart svg, .lab-chart-svg { display: block; width: 100%; height: auto; }
+.lab-svg-point { cursor: pointer; }
+.lab-svg-point:focus { outline: none; stroke: var(--orange); stroke-width: 3; }
+
+.lab-audit { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+.lab-digest { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px; margin: 0 0 10px; font-size: 0.8rem; color: var(--muted); }
+.lab-digest code { font-family: var(--mono); font-size: 0.76rem; color: var(--lime); word-break: break-all; }
+#gr-verify-status { font-family: var(--mono); font-size: 0.74rem; }
+#gr-verify-status[data-tone="ok"] { color: var(--lime); }
+#gr-verify-status[data-tone="bad"] { color: var(--red); }
+.lab-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; }
+.lab-actions .btn { min-height: 40px; padding: 8px 14px; font-size: 0.85rem; }
+
+#gr-export-preview { max-height: 280px; }
+#gr-selftest-summary { font-size: 0.8rem; color: var(--muted); margin: 0 0 8px; }
+#gr-selftest-summary[data-tone="ok"] { color: var(--lime); }
+#gr-selftest-summary[data-tone="bad"] { color: var(--red); }
+.lab-selftest-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 300px; overflow: auto; font-family: var(--mono); font-size: 0.72rem; }
+.lab-selftest-list li { border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; background: #08170f; }
+.lab-selftest-list b { font-weight: 650; }
+.lab-test-pass b { color: var(--lime); }
+.lab-test-fail b { color: var(--red); }
+
 @media (max-width: 1150px) {
   .board { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 900px) {
+  .lab-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (prefers-reduced-motion: reduce) {

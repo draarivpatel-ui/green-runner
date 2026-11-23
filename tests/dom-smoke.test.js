@@ -56,7 +56,7 @@ test('DOM 04: the three judge shortcuts exist with their labels', () => {
 
 test('DOM 05: the page is zero-dependency with only local scripts and styles', () => {
   const srcs = [...html.matchAll(/<script[^>]*src="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(srcs, ['engine.js', 'app.js']);
+  assert.deepEqual(srcs, ['engine.js', 'carbon-lab.js', 'app.js']);
   assert.ok(!/<link[^>]+href="https?:/.test(html));
   assert.ok(!/@import|url\(http/.test(css));
 });
