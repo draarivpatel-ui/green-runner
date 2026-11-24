@@ -486,7 +486,7 @@
         on('gr-delay', 'input', function (e) { ctl.setLabOption('maxDelayHours', e.target.value); });
         on('gr-slowdown', 'input', function (e) { ctl.setLabOption('maxSlowdownPct', e.target.value); });
         on('gr-lab-section', 'click', labDelegate);
-        on('gr-lab-section', 'keydown', function (e) { if (e && e.key === 'Enter') labDelegate(e); });
+        on('gr-lab-section', 'keydown', function (e) { if (e && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); labDelegate(e); } });
         ctl.lab.LAB_POLICIES.forEach(function (p) {
           on('gr-policy-' + p.id, 'change', function (e) { if (e.target.checked) ctl.setLabOption('policyId', p.id); });
         });

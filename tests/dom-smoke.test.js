@@ -10,6 +10,7 @@ const { createFakeDocument } = require('./helpers/fake-dom.js');
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+const appJs = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
 
 function mount() {
   const doc = createFakeDocument();
@@ -317,4 +318,13 @@ test('DOM 34: every preset runs end to end through the controller', () => {
     assert.equal(ctl.result.ok, true, p.id);
     assert.match(el('summary').innerHTML, /Jobs changed/);
   });
+});
+
+test('DOM 35: chart keyboard activation supports Space and prevents default scrolling', () => {
+  assert.match(appJs, /e\.key === 'Enter' \|\| e\.key === ' '/);
+  assert.match(appJs, /preventDefault\(\)/);
+});
+
+test('DOM 36: skip target clears the sticky header', () => {
+  assert.match(css, /#main\s*\{[^}]*scroll-margin-top\s*:/);
 });

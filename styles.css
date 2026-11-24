@@ -78,6 +78,11 @@ h2 { font-size: 1.02rem; margin-bottom: 12px; color: var(--lime); }
 
 :focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
 
+
+#main {
+  scroll-margin-top: 5.5rem;
+}
+
 .board {
   display: grid;
   grid-template-columns: minmax(280px, 1fr) minmax(360px, 1.5fr) minmax(280px, 1fr);

@@ -1292,3 +1292,11 @@ test('Lab Guard 02: runGreenAgent tolerates hostile numbers and fails closed on 
   });
   assert.throws(() => G.runGreenAgent(p.yaml, p.telemetry, { region: 'mars' }), /unknown region/i);
 });
+
+test('Lab A11y regression: interactive SVG charts use group semantics around focusable buttons', () => {
+  for (const svg of [L.renderCurvesSvg({}), L.renderParetoSvg({})]) {
+    assert.equal(svg.includes('role="img"'), false);
+    assert.ok(svg.includes('role="group"'));
+    assert.ok(svg.includes('role="button"'));
+  }
+});

@@ -974,7 +974,7 @@
       return '<circle class="lab-svg-point" cx="' + cx + '" cy="' + cy + '" r="' + (sel ? 8 : 6) + '" fill="' + color + '" stroke="#06130d" stroke-width="1.5" tabindex="0" role="button" data-gr-region="' + escapeXml(g.regionId) + '" aria-label="Select ' + escapeXml(g.name) + ', greenest launch ' + pad2(g.hour) + ':00 UTC at ' + escapeXml(g.gco2) + ' gCO2e"><title>' + escapeXml(g.name) + ': greenest launch ' + pad2(g.hour) + ':00 UTC, ' + escapeXml(g.gco2) + ' gCO2e</title></circle>';
     }).join('\n');
 
-    return '<svg class="lab-chart-svg" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="24-hour carbon intensity curves for six regions with greenest launch hour markers">' +
+    return '<svg class="lab-chart-svg" viewBox="0 0 ' + width + ' ' + height + '" role="group" aria-label="24-hour carbon intensity curves for six regions with greenest launch hour markers">' +
       grid + '\n' + curves + '\n' + startLine + '\n' + markers + '\n</svg>';
   }
 
@@ -1020,7 +1020,7 @@
       return '<circle class="lab-svg-point" cx="' + cx + '" cy="' + cy + '" r="6" fill="' + color + '" stroke="#06130d" stroke-width="1.5" tabindex="0" role="button" data-gr-frontier="' + p.budgetPct + '" data-gr-region="' + escapeXml(p.regionId) + '" aria-label="Slowdown budget ' + p.budgetPct + ' percent saves up to ' + escapeXml(p.gco2Pct) + ' percent carbon via ' + escapeXml(p.name) + '"><title>Budget ' + p.budgetPct + '%: up to ' + escapeXml(p.gco2Pct) + '% saved via ' + escapeXml(p.name) + '</title></circle>';
     }).join('\n');
 
-    return '<svg class="lab-chart-svg" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="Pareto frontier of carbon saved percent against slowdown budget percent for six regions">' +
+    return '<svg class="lab-chart-svg" viewBox="0 0 ' + width + ' ' + height + '" role="group" aria-label="Pareto frontier of carbon saved percent against slowdown budget percent for six regions">' +
       grid + '\n' + regionLines + '\n<polyline fill="none" stroke="#e6f5ea" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round" points="' + frontierPts + '" />\n' + markers +
       '\n<text x="' + (padL + plotW / 2) + '" y="' + (height - 6) + '" text-anchor="middle" fill="#8fb09b" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10">max job slowdown budget %</text>\n</svg>';
   }
