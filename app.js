@@ -366,6 +366,17 @@
       if (regionPoint) { ctl.setLabOption('regionId', regionPoint.getAttribute('data-gr-region')); }
     }
 
+    function labKeyboardDelegate(e) {
+      if (!e || (e.key !== 'Enter' && e.key !== ' ')) return;
+      var t = e.target;
+      if (!t || typeof t.closest !== 'function') return;
+      if (t.closest('button,input,select,textarea,a[href]')) return;
+      var actionable = t.closest('[data-gr-pick-policy],tr[data-policy-id],tr[data-preset-id],tr[data-region-id],[data-gr-region]');
+      if (!actionable) return;
+      e.preventDefault();
+      labDelegate(e);
+    }
+
     function labDownload(name, text) {
       if (typeof document === 'undefined' || !document.createElement || !document.body) return;
       if (typeof URL === 'undefined' || !URL.createObjectURL || typeof Blob === 'undefined') return;
@@ -486,7 +497,7 @@
         on('gr-delay', 'input', function (e) { ctl.setLabOption('maxDelayHours', e.target.value); });
         on('gr-slowdown', 'input', function (e) { ctl.setLabOption('maxSlowdownPct', e.target.value); });
         on('gr-lab-section', 'click', labDelegate);
-        on('gr-lab-section', 'keydown', function (e) { if (e && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); labDelegate(e); } });
+        on('gr-lab-section', 'keydown', labKeyboardDelegate);
         ctl.lab.LAB_POLICIES.forEach(function (p) {
           on('gr-policy-' + p.id, 'change', function (e) { if (e.target.checked) ctl.setLabOption('policyId', p.id); });
         });

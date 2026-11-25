@@ -73,9 +73,10 @@ test('DOM 07: live regions announce parse status, summary and trace', () => {
   ['parse-status', 'summary', 'trace-log'].forEach((id) => assert.match(html, new RegExp('id="' + id + '"[^>]*aria-live="polite"'), id));
 });
 
-test('DOM 08: the diff and job tables are labelled', () => {
+test('DOM 08: the diff and job tables are labelled and their scroll regions take keyboard focus', () => {
   assert.match(html, /id="diff-view"[^>]*aria-label="Side by side YAML patch"/);
   assert.match(html, /id="job-table"[^>]*aria-label="Per job energy and carbon"/);
+  assert.equal((html.match(/class="diff-wrap[^"]*" role="region" tabindex="0"/g) || []).length, 6);
 });
 
 test('DOM 09: stylesheet honours reduced motion and focus, with 44px targets', () => {
@@ -320,9 +321,11 @@ test('DOM 34: every preset runs end to end through the controller', () => {
   });
 });
 
-test('DOM 35: chart keyboard activation supports Space and prevents default scrolling', () => {
-  assert.match(appJs, /e\.key === 'Enter' \|\| e\.key === ' '/);
-  assert.match(appJs, /preventDefault\(\)/);
+test('DOM 35: chart keyboard activation supports Space without swallowing native control keys', () => {
+  assert.match(appJs, /e\.key !== 'Enter' && e\.key !== ' '/);
+  assert.match(appJs, /closest\('button,input,select,textarea,a\[href\]'\)\) return;/);
+  assert.match(appJs, /if \(!actionable\) return;/);
+  assert.match(appJs, /preventDefault\(\);\s*labDelegate\(e\);/);
 });
 
 test('DOM 36: skip target clears the sticky header', () => {

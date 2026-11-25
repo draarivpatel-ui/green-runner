@@ -22,7 +22,6 @@
     <svg class="mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path d="M8 22c0-8 6-13 16-14 0 9-5 15-14 15" fill="currentColor"/><path d="M9 24c4-6 8-9 12-11" stroke="#06130d" stroke-width="2" fill="none"/></svg>
     <div>
       <h1>GreenRunner</h1>
-      <p class="tag">Hands-off carbon-aware CI/CD optimizer for GitLab pipelines</p>
     </div>
   </div>
 
@@ -76,14 +75,14 @@
 
     <section class="panel" aria-labelledby="h-diff">
       <h2 id="h-diff">YAML patch</h2>
-      <div class="diff-wrap">
+      <div class="diff-wrap" role="region" tabindex="0" aria-label="Scrollable YAML patch table">
         <table id="diff-view" class="diff" aria-label="Side by side YAML patch"></table>
       </div>
     </section>
 
     <section class="panel" aria-labelledby="h-job">
       <h2 id="h-job">Per-job estimate</h2>
-      <div class="diff-wrap"><table id="job-table" class="jobs" aria-label="Per job energy and carbon"></table></div>
+      <div class="diff-wrap" role="region" tabindex="0" aria-label="Scrollable per-job estimate table"><table id="job-table" class="jobs" aria-label="Per job energy and carbon"></table></div>
     </section>
   </div>
 
@@ -135,14 +134,14 @@
       <div class="lab-grid">
         <div class="lab-card">
           <h3 class="sub">Five policies on <span id="gr-comparator-preset">preset</span></h3>
-          <div class="diff-wrap lab-wrap-scroll"><table class="jobs lab-table" aria-label="Five policy comparison for the selected preset">
+          <div class="diff-wrap lab-wrap-scroll" role="region" tabindex="0" aria-label="Scrollable five-policy comparison table"><table class="jobs lab-table" aria-label="Five policy comparison for the selected preset">
             <thead><tr><th scope="col">Policy</th><th scope="col" class="num">Wh</th><th scope="col" class="num">gCO2e</th><th scope="col" class="num">Saved</th><th scope="col" class="num">Max job slowdown</th><th scope="col" class="num">Changes</th><th scope="col">Pinned</th><th scope="col">Patch</th><th scope="col">Gates</th></tr></thead>
             <tbody id="gr-comparator-body"></tbody>
           </table></div>
           <button id="gr-load-preset" class="btn ghost" type="button">Load Preset into Editor</button>
 
           <h3 class="sub">Carbon saved %, every preset</h3>
-          <div class="diff-wrap lab-wrap-scroll"><table class="jobs lab-table" aria-label="Carbon saved percent for every preset and policy">
+          <div class="diff-wrap lab-wrap-scroll" role="region" tabindex="0" aria-label="Scrollable carbon savings matrix"><table class="jobs lab-table" aria-label="Carbon saved percent for every preset and policy">
             <thead><tr><th scope="col">Preset</th><th scope="col" class="num">Baseline</th><th scope="col" class="num">Right-size</th><th scope="col" class="num">Time shift</th><th scope="col" class="num">Hands-off</th><th scope="col" class="num">Region + time</th></tr></thead>
             <tbody id="gr-matrix-body"></tbody>
           </table></div>
@@ -153,9 +152,9 @@
           <div id="gr-curves-chart" class="lab-chart"></div>
           <h3 class="sub">Carbon saved vs slowdown budget</h3>
           <div id="gr-pareto-chart" class="lab-chart"></div>
-          <div class="diff-wrap lab-wrap-scroll"><table class="jobs lab-table" id="gr-delay-table" aria-label="Carbon saved percent against max delay hours"></table></div>
+          <div class="diff-wrap lab-wrap-scroll" role="region" tabindex="0" aria-label="Scrollable max-delay sweep table"><table class="jobs lab-table" id="gr-delay-table" aria-label="Carbon saved percent against max delay hours"></table></div>
           <h3 class="sub">Greenest launch hour per region</h3>
-          <div class="diff-wrap lab-wrap-scroll"><table class="jobs lab-table" aria-label="Greenest launch hour per region">
+          <div class="diff-wrap lab-wrap-scroll" role="region" tabindex="0" aria-label="Scrollable greenest launch hour table"><table class="jobs lab-table" aria-label="Greenest launch hour per region">
             <thead><tr><th scope="col">Region</th><th scope="col" class="num">UTC hour</th><th scope="col" class="num">gCO2e</th><th scope="col" class="num">vs launch hour</th></tr></thead>
             <tbody id="gr-greenest-body"></tbody>
           </table></div>

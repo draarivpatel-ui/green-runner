@@ -55,7 +55,6 @@ h2 { font-size: 1.02rem; margin-bottom: 12px; color: var(--lime); }
 }
 .brand { display: flex; align-items: center; gap: 12px; }
 .mark { width: 38px; height: 38px; color: var(--lime); }
-.tag { margin: 2px 0 0; color: var(--muted); font-size: 0.82rem; }
 .judge { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .btn {
@@ -224,6 +223,11 @@ table { border-collapse: collapse; width: 100%; font-size: 0.78rem; }
 
 @media (max-width: 900px) {
   .lab-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 700px) {
+  .judge { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr); }
+  .judge .btn { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
