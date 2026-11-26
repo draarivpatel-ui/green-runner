@@ -274,7 +274,7 @@
       var r = ctl.result;
       if (!r) { setHTML('trace-log', '<li class="empty">The agent is idle. Press Run Hands-Off Duo Agent.</li>'); return; }
       setHTML('trace-log', r.trace.map(function (t) {
-        return '<li class="tr"><div class="tr-head"><span class="tr-tool">' + esc(t.tool) + '</span><span class="tr-seq">#' + t.seq + '</span></div><pre>' + esc(JSON.stringify(t.input)) + '\n' + esc(JSON.stringify(t.output).slice(0, 360)) + '</pre></li>';
+        return '<li class="tr"><div class="tr-head"><span class="tr-tool">' + esc(t.tool) + '</span><span class="tr-seq">#' + t.seq + '</span></div><pre>' + esc(JSON.stringify(t.input)) + '\n' + esc(Array.from(JSON.stringify(t.output)).slice(0, 360).join('')) + '</pre></li>';
       }).join(''));
     };
 

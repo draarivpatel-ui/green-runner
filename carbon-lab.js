@@ -673,7 +673,10 @@
   }
 
   function payloadWithoutDigest(payload) {
-    var copy = Object.assign({}, payload || {});
+    var copy = Object.create(null);
+    Object.keys(payload || {}).forEach(function (k) {
+      Object.defineProperty(copy, k, { value: payload[k], enumerable: true, writable: true, configurable: true });
+    });
     delete copy.integritySha256;
     return copy;
   }
@@ -703,7 +706,10 @@
    */
   function csvEscape(value) {
     var text = value === null || value === undefined ? '' : String(value);
-    if (/^\s*[=+\-@]/.test(text) || /^[\t\r\n]/.test(text)) {
+    var lead = (/^[\s\p{Cf}\p{Cc}]*/u.exec(text) || [''])[0];
+    var first = text.charAt(lead.length);
+    var plainNumber = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(text.slice(lead.length));
+    if (lead.length > 0 || (first !== '' && '=+-@'.indexOf(first) !== -1 && !(first === '-' && plainNumber))) {
       text = "'" + text;
     }
     if (/[",\n\r]/.test(text)) {
